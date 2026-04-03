@@ -1,0 +1,4 @@
+ai/.env
+ai/venv/
+ai/dataset
+ai/fma_metadata
