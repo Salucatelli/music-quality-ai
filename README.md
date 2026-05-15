@@ -17,6 +17,10 @@ O projeto está organizado da seguinte forma:
 
 O projeto utiliza o **Free Music Archive (FMA)**, um dataset abrangente de músicas com metadados ricos, incluindo características numéricas (como MFCCs, Tom, Ritmo, etc.) e informações sobre popularidade/qualidade. Essas características são usadas como entrada para a CNN, enquanto a popularidade serve como o rótulo de qualidade a ser previsto.
 
+Comecei com o dataset small do FMA, que possui 8.000 músicas e 8 gêneros, sendo 100% equilibrado, com 1.000 músicas para cada gênero. 
+
+Agora pretendo testar o dataset Large, que contem 106.574 músicas e 161 gêneros, mas ele não é 100% equilibrado, podendo causar um "vício" na IA dependendo do estilo da música prevista. Porém, esse dataset desequilibrado representa melhor a realidade, com gêneros possuindo muito mais músicas que outros.
+
 ## Tecnologias Utilizadas
 
 As principais tecnologias e bibliotecas empregadas neste projeto incluem:

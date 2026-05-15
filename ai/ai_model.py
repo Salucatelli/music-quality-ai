@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import os
+import joblib
 
 #####=======================================================================================================
 ##### O X são os dados numéricos da música, como MFCCs, Tom, Ritmo, etc.
@@ -15,9 +16,21 @@ import os
 ##### Então, o objetivo é conseguir prever a popularidade de uma música com base nos dados numéricos.
 #####=======================================================================================================
 
-path = os.getcwd() + r"\ai\dataset"
+path = os.getcwd() + r"\dataset"
 
 #================================ Carregar os dados para treino e teste =====================================#
+
+# Vou usar apenas esse grupo de dados, que vão dar 343 colunas e não 518.
+colunas_selecionadas = [
+    'chroma_stft', 
+    'tonnetz', 
+    'mfcc', 
+    'spectral_centroid', 
+    'spectral_bandwidth', 
+    'spectral_contrast', 
+    'spectral_rolloff', 
+    'rmse' # No FMA original, o RMS é chamado de 'rmse'
+]
 
 # Carregando os metadados (quem é a música)
 # header=[0, 1] porque o tracks.csv tem duas linhas de cabeçalho
@@ -33,7 +46,7 @@ subset_ids = tracks.index[subset_mask]
 
 # 2. Pegar os rótulos (y) e as características (X) apenas desse subset
 y = tracks.loc[subset_ids, ('track', 'listens')].values
-X = features.loc[subset_ids].values
+X = features.loc[subset_ids, colunas_selecionadas].values
 
 # Como 'listens' pode ter números gigantescos, aplicar o logaritmo 
 # ajuda MUITO a rede neural a convergir mais rápido.
@@ -50,6 +63,10 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 scaler = StandardScaler()
 X_train = scaler.fit_transform(X_train)
 X_test = scaler.transform(X_test)
+
+# Salvar o scaler para usar no teste de outras musicas
+joblib.dump(scaler, 'scaler.joblib')
+print("Scaler salvo")
 
 #================================ Criando a Rede Neural =======================================#
 
