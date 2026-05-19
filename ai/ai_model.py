@@ -2,7 +2,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_absolute_error, r2_score
 import tensorflow as tf
-from tensorflow.keras import layers, models
+from tensorflow.keras import layers, models,optimizers
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -40,13 +40,19 @@ tracks = pd.read_csv(path+r'\tracks.csv', index_col=0, header=[0, 1])
 # header=[0, 1, 2] porque o features.csv tem três linhas de cabeçalho
 features = pd.read_csv(path + r'\features.csv', index_col=0, header=[0, 1, 2])
 
-# 1. Filtrar apenas o subset 'small' das tracks
-subset_mask = tracks[('set', 'subset')] == 'small'
-subset_ids = tracks.index[subset_mask]
+## USANDO O DATASET MEDIUM
+# # 1. Pegando apenas o subset small e medium, com 25.000 músicas
+# subset_mask = tracks[('set', 'subset')].isin(['small', 'medium'])
+# subset_ids = tracks.index[subset_mask]
 
-# 2. Pegar os rótulos (y) e as características (X) apenas desse subset
-y = tracks.loc[subset_ids, ('track', 'listens')].values
-X = features.loc[subset_ids, colunas_selecionadas].values
+# # 2. Pegar os rótulos (y) e as características (X) apenas desse subset
+# y = tracks.loc[subset_ids, ('track', 'listens')].values
+# X = features.loc[subset_ids, colunas_selecionadas].values
+
+## USANDO O DATASET FULL
+# 1. Pegar os rótulos (y) e as características (X)
+y = tracks[('track', 'listens')].values
+X = features[colunas_selecionadas].values
 
 # Como 'listens' pode ter números gigantescos, aplicar o logaritmo 
 # ajuda MUITO a rede neural a convergir mais rápido.
@@ -70,30 +76,48 @@ print("Scaler salvo")
 
 #================================ Criando a Rede Neural =======================================#
 
-# Criando a estrutura da rede
+# 1. Expandindo a capacidade da rede para aguentar as 106k músicas
 model = models.Sequential([
-    # Camada de entrada (recebe as 518 características do FMA)
-    layers.Dense(256, activation='relu', input_shape=(X_train.shape[1],)),
-    layers.Dropout(0.3), # Ajuda a não viciar a rede (overfitting)
+    # Camada de entrada mais robusta
+    layers.Dense(512, activation='relu', input_shape=(X_train.shape[1],)),
+    layers.BatchNormalization(), # Estabiliza o aprendizado entre as camadas
+    layers.Dropout(0.3),
     
     # Camadas intermediárias
+    layers.Dense(256, activation='relu'),
+    layers.BatchNormalization(),
+    layers.Dropout(0.3),
+    
     layers.Dense(128, activation='relu'),
+    layers.BatchNormalization(),
     layers.Dropout(0.2),
+    
     layers.Dense(64, activation='relu'),
     
-    # Camada de saída: apenas 1 neurônio para cuspir a "nota" de qualidade
+    # Camada de saída para regressão linear pura
     layers.Dense(1, activation='linear')
 ])
 
-# Compilando o modelo
-model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+# 2. Controlando a taxa de aprendizado (Crucial para regressão logarítmica)
+# O padrão do Adam (0.001) é muito rápido. Reduzir para 0.0005 ajuda a achar o ajuste fino.
+otimizador_ajustado = optimizers.Adam(learning_rate=0.0005)
+
+model.compile(optimizer=otimizador_ajustado, loss='mse', metrics=['mae'])
 
 # model.summary() # Mostra o desenho da rede no terminal
 
 
 #================================ Treinando a Rede Neural =======================================#
 
-model.fit(X_train, y_train, epochs=50, batch_size=32)
+# Aumentamos o batch_size para 128 ou 256. Com 106k músicas, lotes maiores dão 
+# um direcionamento matemático muito mais estável para o gradiente da rede.
+# IMPORTANTE: Adicione validation_data se você tiver o X_val/y_val separado!
+model.fit(
+    X_train, y_train, 
+    epochs=60, 
+    batch_size=128, # Subiu de 32 para 128
+    validation_split=0.15 # Usa 15% dos dados para validar e o EarlyStopping funcionar
+)
 
 # Salvando o modelo treinado
 model.save('music_quality_prediction_model.keras')
