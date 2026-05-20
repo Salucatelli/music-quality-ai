@@ -3,11 +3,10 @@ import numpy as np
 from scipy import stats
 
 def compute_features(audio_path):
-    # Carregar exatamente como o FMA (sr=22050 padrão se sr=None não for forçado)
     x, sr = librosa.load(audio_path, sr=22050, duration=30)
     
     def get_stats(feat):
-        # ORDEM OFICIAL FMA: kurtosis, skew, max, mean, median, min, std
+        # ordem do fma: kurtosis, skew, max, mean, median, min, std
         return np.concatenate([
             stats.kurtosis(feat, axis=1),
             stats.skew(feat, axis=1),
@@ -18,7 +17,6 @@ def compute_features(audio_path):
             np.std(feat, axis=1)
         ])
 
-    # Extração dos componentes
     # 1. Chroma STFT
     chroma = librosa.feature.chroma_stft(y=x, sr=sr, n_chroma=12)
     chroma_stats = get_stats(chroma) # 84
@@ -51,9 +49,7 @@ def compute_features(audio_path):
     rms = librosa.feature.rms(y=x)
     rms_stats = get_stats(rms) # 7
 
-    # Concatenação na ordem que costuma aparecer no features.csv
-    # Nota: O FMA full tem mais chromas (CENS, CQT), mas se você treinar 
-    # apenas com estes, o vetor deve seguir esta sequência:
+    # Concatenação na ordem do features.csv
     features_vector = np.concatenate([
         chroma_stats,     # 84
         tonnetz_stats,    # 42

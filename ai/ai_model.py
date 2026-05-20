@@ -20,7 +20,7 @@ path = os.getcwd() + r"\dataset"
 
 #================================ Carregar os dados para treino e teste =====================================#
 
-# Vou usar apenas esse grupo de dados, que vão dar 343 colunas e não 518.
+# Vou usar apenas esse grupo de dados, que vão dar 343 colunas, e não 518.
 colunas_selecionadas = [
     'chroma_stft', 
     'tonnetz', 
@@ -32,30 +32,47 @@ colunas_selecionadas = [
     'rmse' # No FMA original, o RMS é chamado de 'rmse'
 ]
 
-# Carregando os metadados (quem é a música)
+# Carregando os metadados 
 # header=[0, 1] porque o tracks.csv tem duas linhas de cabeçalho
 tracks = pd.read_csv(path+r'\tracks.csv', index_col=0, header=[0, 1])
 
-# Carregando as características (os números para a IA)
+# Carregando as características 
 # header=[0, 1, 2] porque o features.csv tem três linhas de cabeçalho
 features = pd.read_csv(path + r'\features.csv', index_col=0, header=[0, 1, 2])
 
-## USANDO O DATASET MEDIUM
-# # 1. Pegando apenas o subset small e medium, com 25.000 músicas
-# subset_mask = tracks[('set', 'subset')].isin(['small', 'medium'])
+
+
+# ## USANDO O DATASET SMALL
+# # Pegando apenas o subset small com 8000 músicas
+# subset_mask = tracks[('set', 'subset')].isin(['small'])
 # subset_ids = tracks.index[subset_mask]
 
-# # 2. Pegar os rótulos (y) e as características (X) apenas desse subset
+# # Pegar os rótulos (y) e as características (X) apenas desse subset
 # y = tracks.loc[subset_ids, ('track', 'listens')].values
 # X = features.loc[subset_ids, colunas_selecionadas].values
 
-## USANDO O DATASET FULL
-# 1. Pegar os rótulos (y) e as características (X)
+
+
+# ## USANDO O DATASET MEDIUM
+# # Pegando apenas o subset small e medium, com 25.000 músicas
+# subset_mask = tracks[('set', 'subset')].isin(['small', 'medium'])
+# subset_ids = tracks.index[subset_mask]
+
+# # Pegar os rótulos (y) e as características (X) apenas desse subset
+# y = tracks.loc[subset_ids, ('track', 'listens')].values
+# X = features.loc[subset_ids, colunas_selecionadas].values
+
+
+
+# USANDO O DATASET FULL
+# Pegar os rótulos (y) e as características (X)
 y = tracks[('track', 'listens')].values
 X = features[colunas_selecionadas].values
 
+
+
 # Como 'listens' pode ter números gigantescos, aplicar o logaritmo 
-# ajuda MUITO a rede neural a convergir mais rápido.
+# ajuda a rede neural a convergir mais rápido.
 y = np.log1p(y) 
 
 print(f"Dados prontos! Temos {X.shape[0]} músicas e {X.shape[1]} características para cada uma.")
@@ -76,9 +93,9 @@ print("Scaler salvo")
 
 #================================ Criando a Rede Neural =======================================#
 
-# 1. Expandindo a capacidade da rede para aguentar as 106k músicas
+
 model = models.Sequential([
-    # Camada de entrada mais robusta
+    # Camada de entrada 
     layers.Dense(512, activation='relu', input_shape=(X_train.shape[1],)),
     layers.BatchNormalization(), # Estabiliza o aprendizado entre as camadas
     layers.Dropout(0.3),
@@ -94,29 +111,23 @@ model = models.Sequential([
     
     layers.Dense(64, activation='relu'),
     
-    # Camada de saída para regressão linear pura
+    # Camada de saida
     layers.Dense(1, activation='linear')
 ])
 
-# 2. Controlando a taxa de aprendizado (Crucial para regressão logarítmica)
-# O padrão do Adam (0.001) é muito rápido. Reduzir para 0.0005 ajuda a achar o ajuste fino.
+# 2. Controlando a taxa de aprendizado 
 otimizador_ajustado = optimizers.Adam(learning_rate=0.0005)
 
 model.compile(optimizer=otimizador_ajustado, loss='mse', metrics=['mae'])
 
-# model.summary() # Mostra o desenho da rede no terminal
-
 
 #================================ Treinando a Rede Neural =======================================#
 
-# Aumentamos o batch_size para 128 ou 256. Com 106k músicas, lotes maiores dão 
-# um direcionamento matemático muito mais estável para o gradiente da rede.
-# IMPORTANTE: Adicione validation_data se você tiver o X_val/y_val separado!
-model.fit(
+history = model.fit(
     X_train, y_train, 
     epochs=60, 
-    batch_size=128, # Subiu de 32 para 128
-    validation_split=0.15 # Usa 15% dos dados para validar e o EarlyStopping funcionar
+    batch_size=128, 
+    validation_split=0.15 
 )
 
 # Salvando o modelo treinado
@@ -128,29 +139,42 @@ model.save('music_quality_prediction_model.keras')
 # y com os valores previstos, ou o y^
 y_pred = model.predict(X_test)
 
-#MAE (Mean Absolute Error): Diz, em média, o quanto a IA errou para mais ou para menos.
-# R^2 Score (Coeficiente de Determinação): Diz a porcentagem de variação dos dados que seu modelo consegue explicar (vai de -infinito até 1.0, onde 1.0 é a perfeição).
+# MAE (Mean Absolute Error): Diz, em média, o quanto a IA errou para mais ou para menos.
+# R^2 Score (Coeficiente de Determinação): Diz a porcentagem de variação dos dados que o modelo consegue explicar 
 
 # Calculando o erro médio absoluto
 mae = mean_absolute_error(y_test, y_pred)
-# Calculando o R² (quanto mais próximo de 1, melhor)
+# Calculando o R² 
 r2 = r2_score(y_test, y_pred)
 
 print(f"Erro Médio Absoluto (MAE): {mae:.4f}")
 print(f"Coeficiente R²: {r2:.4f}")
 
-
 #================================ Plotando gráficos do teste =======================================#
 
-plt.figure(figsize=(8, 6))
-# Plota os valores reais vs os valores preditos
-plt.scatter(y_test, y_pred, alpha=0.5, color='purple')
+plt.figure(figsize=(14, 5))
 
-# Linha diagonal que representa a perfeição (onde Predito = Real)
-plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
-
-plt.xlabel('Valores Reais (y_test)')
-plt.ylabel('Previsões da IA (y_pred)')
-plt.title('Comparação: Real vs. Predito')
+# Grafico 1: Evolução da Perda (Loss / MSE) ao longo das epocas
+plt.subplot(1, 2, 1)
+plt.plot(history.history['loss'], label='Erro no Treino (MSE)', color='blue')
+plt.plot(history.history['val_loss'], label='Erro na Validação (MSE)', color='orange')
+plt.title('Evolução do Erro Durante o Treino')
+plt.xlabel('Épocas')
+plt.ylabel('Erro Quadrático Médio (MSE)')
+plt.legend()
 plt.grid(True)
+
+# Grafico 2: Dispersao (Valores Reais vs. Valores Previstos)
+plt.subplot(1, 2, 2)
+plt.scatter(y_test, y_pred, alpha=0.3, color='purple', label='Músicas de Teste')
+# Linha perfeita onde o previsto seria exatamente igual ao real
+plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], color='red', lw=2, linestyle='--', label='Previsão Perfeita')
+plt.title('Valores Reais vs. Previsões da IA')
+plt.xlabel('Popularidade Real (Escala Log)')
+plt.ylabel('Popularidade Prevista (Escala Log)')
+plt.legend()
+plt.grid(True)
+
+# Exibe os gráficos na tela
+plt.tight_layout()
 plt.show()
