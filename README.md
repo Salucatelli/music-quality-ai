@@ -1,86 +1,71 @@
-# music-quality-ai
+# Music Quality & Popularity AI 🎵🧠
 
-## Visão Geral
+Este projeto foi desenvolvido como projeto em uma disciplina de Inteligência Artificial 2. O objetivo principal é investigar, treinar e comparar diferentes arquiteturas de redes neurais artificiais capazes de analisar arquivos de áudio e prever o sucesso/popularidade de obras musicais utilizando o ecossistema do dataset **FMA (Free Music Archive)**.
 
-Este repositório apresenta um projeto de Inteligência Artificial focado na avaliação da qualidade musical. Utilizando uma Rede Neural Convolucional (CNN) e o dataset Free Music Archive (FMA), o objetivo é desenvolver um modelo capaz de prever a popularidade ou a qualidade percebida de uma música com base em suas características numéricas.
+---
 
-## Estrutura do Projeto
+## 🛠️ Arquitetura do Projeto e Fluxo de Arquivos
 
-O projeto está organizado da seguinte forma:
+O repositório está estruturado de forma a separar os scripts de processamento de dados, treinamento das redes e inferência do usuário final:
 
-*   `ai/`:
-    *   `ai_model.py`: Contém a definição, treinamento e avaliação da Rede Neural Convolucional (CNN).
-    *   `ai.py`: Demonstra como carregar o modelo treinado e utilizá-lo para fazer previsões de qualidade musical.
-    *   `requirements.txt`: Lista todas as dependências Python necessárias para executar o projeto.
+* **`get_mp3_data.py` / `compute_features`**: Módulo responsável por simular localmente a extração das 343 características acústicas utilizadas do FMA (MFCC, Chroma, Spectral Contrast, etc.) usando a biblioteca `librosa`.
+* **Scripts de Treinamento**: Notebooks ou scripts Python que carregam os metadados brutos do FMA (`tracks.csv` e `features.csv`), aplicam transformações logarítmicas ($np.log1p$) na variável alvo (`listens`) para estabilizar o aprendizado de regressão, e treinam as redes.
+* **`ai.py`**: O script principal de inferência. Ele carrega as redes neurais salvas, lê uma música de teste (`./songs/teste.mp3`), formata os dados e exibe a estimativa real de plays revertendo a escala logarítmica ($np.expm1$).
 
-## Dataset
+---
 
-O projeto utiliza o **Free Music Archive (FMA)**, um dataset abrangente de músicas com metadados ricos, incluindo características numéricas (como MFCCs, Tom, Ritmo, etc.) e informações sobre popularidade/qualidade. Essas características são usadas como entrada para a CNN, enquanto a popularidade serve como o rótulo de qualidade a ser previsto.
+## 🔬 Abordagens e Modelos Desenvolvidos
 
-Comecei com o dataset small do FMA, que possui 8.000 músicas e 8 gêneros, sendo 100% equilibrado, com 1.000 músicas para cada gênero. 
+O projeto foi dividido em duas abordagens distintas de Aprendizado Profundo:
 
-Agora pretendo testar o dataset Large, que contem 106.574 músicas e 161 gêneros, mas ele não é 100% equilibrado, podendo causar um "vício" na IA dependendo do estilo da música prevista. Porém, esse dataset desequilibrado representa melhor a realidade, com gêneros possuindo muito mais músicas que outros.
+### 1. Perceptron Multicamadas (MLP) 
+Focada em processar dados tabulares em larga escala (utilizando o dataset **FMA Full** com mais de 106.000 músicas), esta rede analisa os 343 metadados estatísticos previamente extraídos do áudio e armazenados no dataset FMA.
 
-## Tecnologias Utilizadas
+* **Topologia da Rede**: Estrutura piramidal profunda com afunilamento gradual (`Dense(512) -> Dense(256) -> Dense(128) -> Dense(64) -> Dense(1)`).
+* **Técnicas de Regularização**: Utilização de camadas de **Batch Normalization** após cada ativação ReLU para garantir estabilidade numérica e impedir explosão de gradientes em lotes massivos, combinada com **Dropout (30% e 20%)** para atenuar o *overfitting*.
+* **Otimização**: Compilada com a função de perda Erro Quadrático Médio (`MSE`), utilizando o otimizador Adam com uma taxa de aprendizado reduzida (`learning_rate=0.0005`) para garantir passos de ajuste finos e precisos.
+* **Batch Size**: Configurado em `128` para estabilizar o direcionamento matemático do gradiente dadas as dimensões da base *Full*.
 
-As principais tecnologias e bibliotecas empregadas neste projeto incluem:
+### 2. Rede Neural Convolucional (CNN) 
+Esta abordagem elimina planilhas de metadados humanos e faz a IA "ouvir" o áudio bruto do subset **FMA Small** (8.000 músicas).
 
-*   **Python**
-*   **TensorFlow/Keras**: Para a construção e treinamento da Rede Neural Convolucional.
-*   **scikit-learn**: Para pré-processamento de dados e divisão em conjuntos de treino/teste.
-*   **Pandas**: Para manipulação e análise de dados.
-*   **NumPy**: Para operações numéricas eficientes.
-*   **Matplotlib**: Para visualização de dados (implícito no `ai_model.py` para gráficos de treinamento).
+* **Processamento de Entrada**: Os arquivos `.mp3` brutos são convertidos usando a transformada de Fourier em **Espectrogramas de Mel** (matrizes de intensidade tempo-frequência), normalizados entre `0` e `1` e tratados como imagens digitais.
+* **Topologia Convolucional**: Três blocos alternados de convoluções bidimensionais e subamostragem (`Conv2D` de 32 e 64 filtros com tamanho $3 \times 3$ + `MaxPooling2D` de $2 \times 2$). As convoluções extraem características fluídas e tímbricas diretamente do espectrograma, enquanto o pooling garante invariância espacial.
+* **Camada de Decisão**: A matriz resultante é achatada (`Flatten`), repassada por uma camada densa de 64 neurônios com Dropout (30%) e finalizada em uma saída linear de regressão.
 
-## Como Usar
+---
 
-Para configurar e executar este projeto localmente, siga os passos abaixo:
+## 📊 Resultados Obtidos 
 
-### 1. Download do Dataset FMA Metadata
+Ao avaliar os modelos através das métricas de **Erro Médio Absoluto (MAE)** e **Coeficiente de Determinação ($R^2$)**, o projeto gerou uma valiosa discussão teórica para a área de recuperação de informação musical (MIR):
 
-O modelo utiliza metadados do dataset Free Music Archive (FMA). Como esses arquivos não estão incluídos no repositório (devido ao tamanho e à licença), você precisará baixá-los separadamente.
+1.  **O Limite do Áudio**: Ambos os modelos obtiveram desempenhos estáveis de MAE em escala logarítmica (oscilando próximo de `1.03`).
+2.  **Fenômeno da Média Amostral**: Os gráficos de dispersão revelaram que, diante de características estritamente acústicas, as redes neurais tendem a predizer valores próximos à média geral de acessos da base (centralizados na faixa de 7.8 a 8.2 no log).
+3.  **Conclusão**: O projeto provou empiricamente que **a popularidade de uma música não está gravada exclusivamente em suas frequências sonoras**. Faixas acusticamente idênticas possuem desempenhos de mercado caóticos e distintos no mundo real devido a fatores externos invisíveis ao áudio (relevância do artista, algoritmos de recomendação das plataformas, investimentos em marketing, contexto temporal de lançamento, etc.).
 
-1.  **Baixe o arquivo `fma_metadata.zip`** do link oficial: [https://os.unil.cloud.switch.ch/fma/fma_metadata.zip](https://os.unil.cloud.switch.ch/fma/fma_metadata.zip).
-2.  **Descompacte o arquivo** `fma_metadata.zip` na raiz do seu projeto. Isso criará uma pasta `fma_metadata` contendo os arquivos `tracks.csv`, `features.csv`, entre outros, que são essenciais para o funcionamento do modelo.
+---
 
-### 2. Clonar o Repositório
+## 🚀 Como Executar o Projeto
 
-```bash
-git clone https://github.com/Salucatelli/music-quality-ai.git
-cd music-quality-ai
-```
-
-### 3. Instalar Dependências
-
-Certifique-se de ter o `pip` instalado. Em seguida, instale as dependências listadas no `requirements.txt`:
+### Pré-requisitos
+Certifique-se de ter o Python 3.10+ e as dependências instaladas. Recomenda-se o uso de um ambiente virtual (`venv`):
 
 ```bash
-pip install -r ai/requirements.txt
+python -m venv venv
+./venv/Scripts/activate  # No Windows
+pip install tensorflow numpy pandas librosa scikit-learn joblib matplotlib
 ```
 
-### 4. Treinar o Modelo (Opcional)
+### Instalação do Dataset (Para Treinamento)
+* Baixe o arquivo de tabelas fma_metadata.zip e a pasta de áudios brutos `fma_small.zip` direto do repositório oficial do Free Music Archive.
 
-O arquivo `ai/ai_model.py` contém o código para treinar a CNN. Se você deseja treinar o modelo do zero ou com dados atualizados, execute:
+* Descompacte-os e configure os caminhos de diretório (`PATH_METADATA` e `PATH_AUDIO`) nos scripts de treino.
+
+### Rodando a Inferência em Tempo Real
+* Para submeter uma música de sua preferência à análise da Inteligência Artificial:
+
+* Insira um arquivo de áudio no formato MP3 dentro da pasta `./songs/` e execute o arquivo principal de inferência no terminal:
 
 ```bash
-python ai/ai_model.py
+python ai.py
 ```
-
-Este script irá carregar os dados do FMA, pré-processá-los, treinar a CNN e salvar o modelo treinado como `modelo_qualidade_musica.keras`.
-
-### 5. Fazer Previsões
-
-Para utilizar o modelo treinado e prever a qualidade de novas músicas, execute o script `ai/ai.py`:
-
-```bash
-python ai/ai.py
-```
-
-Este script carrega o modelo salvo e demonstra como fazer previsões. Você precisará fornecer os dados de entrada (`X_novo`) para as músicas que deseja avaliar.
-
-## Métricas de Avaliação
-
-O desempenho do modelo é avaliado utilizando as seguintes métricas:
-
-*   **MAE (Mean Absolute Error)**: Indica, em média, o quanto a IA errou para mais ou para menos na previsão da qualidade musical.
-*   **R^2 Score (Coeficiente de Determinação)**: Representa a porcentagem da variação dos dados que o modelo consegue explicar. Um valor mais próximo de 1 indica um ajuste melhor do modelo aos dados.
