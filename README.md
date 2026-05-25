@@ -1,4 +1,4 @@
-# Music Quality & Popularity AI 🎵🧠
+# Music Quality AI 🎵
 
 Este projeto foi desenvolvido como projeto em uma disciplina de Inteligência Artificial 2. O objetivo principal é investigar, treinar e comparar diferentes arquiteturas de redes neurais artificiais capazes de analisar arquivos de áudio e prever o sucesso/popularidade de obras musicais utilizando o ecossistema do dataset **FMA (Free Music Archive)**.
 
